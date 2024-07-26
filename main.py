@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from secrets.KDL_passwords import KDL
 
 import pandas as pd
 import requests as req
+
+from credentials.KDL_passwords import KDL
 
 
 def request(dbname, start_date: type | None = None, end_date: type | None = None):
