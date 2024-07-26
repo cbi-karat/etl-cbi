@@ -22,9 +22,9 @@ jobs:
       - name: "Update pip"
         run: python -m pip install --upgrade pip
       - name: "Install ruff"
-        run: pip install ruff
+        run: pip install ruff==0.5.5
       - name: "Install pre-commit"
-        run: pip install pre-commit
+        run: pip install pre-commit==3.7.1
       - name: "Run Ruff"
         run: ruff check --output-format=github .
       - name: "Run pre-commit"
