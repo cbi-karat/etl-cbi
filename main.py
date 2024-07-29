@@ -9,19 +9,19 @@ import requests as req
 from credentials.KDL_passwords import KDL
 
 
-def request(dbname, start_date: type | None = None, end_date: type | None = None):
+def request(dbname, start_date: type | None = None, end_date: type | None = None):  # noqa: C901, PLR0911, PLR0912
     datesymbols = 10
-    error = 2
-    errors = ["Dates are required", "Dates aren't required", "The error isn't defined"]
+    error = 3
+    errors = ["Dates are required", "Dates aren't required", "Incorrect date", "The error isn't defined"]
     correctinput, dtrequired = getjson_test(dbname)
     if not correctinput:
         return "The table wasn't found"
     if start_date is None and end_date is None:
         dates = False
     elif (
-        start_date[0:1].isdigit()
-        and start_date[3:4].isdigit()
-        and start_date[6:9].isdigit()
+        start_date[0:2].isdigit()
+        and start_date[3:5].isdigit()
+        and start_date[6:].isdigit()
         and start_date[2] == "."
         and start_date[5] == "."
         and len(start_date) == datesymbols
@@ -29,18 +29,23 @@ def request(dbname, start_date: type | None = None, end_date: type | None = None
     ):
         dates = True
         start_date = start_date.split(".")
-        start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
-        end_date = start_date
+        try:
+            start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
+        except ValueError:
+            error = 2
+            return errors[error]
+        else:
+            end_date = start_date
     elif (
-        start_date[0:1].isdigit()
-        and start_date[3:4].isdigit()
-        and start_date[6:9].isdigit()
+        start_date[0:2].isdigit()
+        and start_date[3:5].isdigit()
+        and start_date[6:].isdigit()
         and start_date[2] == "."
         and start_date[5] == "."
         and len(start_date) == datesymbols
-        and end_date[0:1].isdigit()
-        and end_date[3:4].isdigit()
-        and end_date[6:9].isdigit()
+        and end_date[0:2].isdigit()
+        and end_date[3:5].isdigit()
+        and end_date[6:].isdigit()
         and end_date[2] == "."
         and end_date[5] == "."
         and len(end_date) == datesymbols
@@ -48,8 +53,16 @@ def request(dbname, start_date: type | None = None, end_date: type | None = None
         dates = True
         start_date = start_date.split(".")
         end_date = end_date.split(".")
-        start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
-        end_date = date(int(end_date[2]), int(end_date[1]), int(end_date[0]))
+        try:
+            start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
+        except ValueError:
+            error = 2
+            return errors[error]
+        try:
+            end_date = date(int(end_date[2]), int(end_date[1]), int(end_date[0]))
+        except ValueError:
+            error = 2
+            return errors[error]
     else:
         return "Incorrect date information"
     if not dates and dtrequired:
