@@ -8,10 +8,13 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 pandas = "^2.2.2"
+requests = "^2.32.3"
+datetime = "^5.5"
 
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.1"
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]
