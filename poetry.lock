@@ -302,7 +302,7 @@ files = [
 [[package]]
 name = "distlib"
 version = "0.3.8"
-description = "Distribution utilities"
+description = "request utilities"
 optional = false
 python-versions = "*"
 files = [
