@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import date
 
@@ -9,7 +7,7 @@ import requests as req
 from credentials.KDL_passwords import KDL
 
 
-def request(dbname, start_date: type | None = None, end_date: type | None = None):
+def request(dbname, start_date: None = None, end_date: None = None):
     correctinput, dtrequired = getjson_test(dbname)
     if not correctinput:
         return "The table wasn't found"
