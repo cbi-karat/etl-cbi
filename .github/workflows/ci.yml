@@ -26,7 +26,7 @@ jobs:
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Run Ruff"
-        run: ruff check --output-format=github .
+        run: ruff check --output-format=full .
       - name: "Run pre-commit"
         run: |
           echo '```console' > $GITHUB_STEP_SUMMARY
