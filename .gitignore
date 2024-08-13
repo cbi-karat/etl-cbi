@@ -1,2 +1,6 @@
 .venv
 credentials
+tables
+.vscode
+__pycache__/
+*.py[cod]

@@ -9,7 +9,7 @@ import requests as req
 from credentials.KDL_passwords import KDL
 
 
-def request(dbname, start_date: type | None = None, end_date: type | None = None):
+def request(dbname, start_date: type | None = None, end_date: type | None = None):  # Проверить данные на корректность
     correctinput, dtrequired = getjson_test(dbname)
     if not correctinput:
         return "The table wasn't found"
@@ -19,15 +19,16 @@ def request(dbname, start_date: type | None = None, end_date: type | None = None
     return check1(dtrequired, dbname, start_date, end_date)
 
 
-def check1(dtrequired, dbname, start_date, end_date):
+def check1(dtrequired, dbname, start_date, end_date):  # Проверить данные на корректность
     datesymbols = 10
     if (
-        start_date[0:2].isdigit()
+        isinstance(start_date, str)
+        and len(start_date) == datesymbols
+        and start_date[0:2].isdigit()
         and start_date[3:5].isdigit()
         and start_date[6:].isdigit()
         and start_date[2] == "."
         and start_date[5] == "."
-        and len(start_date) == datesymbols
         and end_date is None
     ):
         dates = True
@@ -40,18 +41,20 @@ def check1(dtrequired, dbname, start_date, end_date):
             end_date = start_date
             return check2(dates, dtrequired, dbname, start_date, end_date)
     elif (
-        start_date[0:2].isdigit()
+        isinstance(start_date, str)
+        and len(start_date) == datesymbols
+        and start_date[0:2].isdigit()
         and start_date[3:5].isdigit()
         and start_date[6:].isdigit()
         and start_date[2] == "."
         and start_date[5] == "."
-        and len(start_date) == datesymbols
+        and isinstance(end_date, str)
+        and len(end_date) == datesymbols
         and end_date[0:2].isdigit()
         and end_date[3:5].isdigit()
         and end_date[6:].isdigit()
         and end_date[2] == "."
         and end_date[5] == "."
-        and len(end_date) == datesymbols
     ):
         dates = True
         start_date = start_date.split(".")
@@ -70,7 +73,7 @@ def check1(dtrequired, dbname, start_date, end_date):
         return "Incorrect date"
 
 
-def check2(dates, dtrequired, dbname, start_date, end_date):
+def check2(dates, dtrequired, dbname, start_date, end_date):  # Проверить данные на корректность
     errors = ["Dates are required", "Dates aren't required", "The error isn't defined"]
     error = 2
     if not dates and dtrequired:
@@ -86,7 +89,7 @@ def check2(dates, dtrequired, dbname, start_date, end_date):
     return errors[error]
 
 
-def distribution(dbname, start_date, end_date):
+def distribution(dbname, start_date, end_date):  # Обработать даты
     last_month = date(int(str(end_date)[0:4]), int(str(end_date)[5:7]), 1)
     try:
         second_month = date(int(str(start_date)[0:4]), int(str(start_date)[5:7]) + 1, 1)
@@ -113,7 +116,7 @@ def distribution(dbname, start_date, end_date):
     return getjson(dbname, periods_list)
 
 
-def getjson_test(dbname):
+def getjson_test(dbname):  # Проверить данные на корректность
     query = {"DBName": dbname, "НачалоПериода": date(1, 1, 1).isoformat(), "КонецПериода": date(1, 1, 1).isoformat()}
     query = json.dumps(query)
     login = KDL["login"]
@@ -147,7 +150,7 @@ def getjson_test(dbname):
         return True, True
 
 
-def getjson(dbname, periods_list):
+def getjson(dbname, periods_list):  # Получить таблицу без дат
     responses = []
     login = KDL["login"]
     login = login.encode("utf-8")
@@ -172,7 +175,7 @@ def getjson(dbname, periods_list):
     return convert_to_dataframe(responses)
 
 
-def getjson_nodates(dbname):
+def getjson_nodates(dbname):  # Получить таблицу с датами
     query = {"DBName": dbname}
     query = json.dumps(query)
     login = KDL["login"]
@@ -191,7 +194,7 @@ def getjson_nodates(dbname):
     return convert_to_dataframe(response)
 
 
-def convert_to_dataframe(response):
+def convert_to_dataframe(response):  # Сделать таблицу
     if response == []:
         return """There is no data for this period, or this table uses grouping by month.
 If the table uses month grouping, try using the format 01.MM.YYYY"""

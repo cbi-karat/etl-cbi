@@ -4,7 +4,7 @@ line-length = 120
 extend-include = ["*.ipynb"]
 
 [lint]
-select = ['ALL', "NPY201"]
+select = ["ALL", "NPY201"]
 
 ignore = [
     "D",

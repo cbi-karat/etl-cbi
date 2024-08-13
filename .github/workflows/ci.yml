@@ -29,10 +29,10 @@ jobs:
         run: ruff check --output-format=github .
       - name: "Run pre-commit"
         run: |
-          echo '```console' > $GITHUB_STEP_SUMMARY
+          echo "```console" > $GITHUB_STEP_SUMMARY
           # Enable color output for pre-commit and remove it for the summary
           pre-commit run --all-files --show-diff-on-failure --color=always | \
-            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> $GITHUB_STEP_SUMMARY) >&1
+            tee >(sed -E "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g" >> $GITHUB_STEP_SUMMARY) >&1
           exit_code=${PIPESTATUS[0]}
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
           exit $exit_code

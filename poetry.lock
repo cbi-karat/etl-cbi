@@ -32,7 +32,7 @@ test = ["astroid (>=1,<2)", "astroid (>=2,<4)", "pytest"]
 [[package]]
 name = "certifi"
 version = "2024.7.4"
-description = "Python package for providing Mozilla's CA Bundle."
+description = "Python package for providing Mozilla"s CA Bundle."
 optional = false
 python-versions = ">=3.6"
 files = [
@@ -245,7 +245,7 @@ test = ["pytest"]
 [[package]]
 name = "datetime"
 version = "5.5"
-description = "This package provides a DateTime data type, as known from Zope. Unless you need to communicate with Zope APIs, you're probably better off using Python's built-in datetime module."
+description = "This package provides a DateTime data type, as known from Zope. Unless you need to communicate with Zope APIs, you"re probably better off using Python"s built-in datetime module."
 optional = false
 python-versions = ">=3.7"
 files = [
