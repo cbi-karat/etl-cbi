@@ -9,7 +9,7 @@ import requests as req
 from credentials.KDL_passwords import KDL
 
 
-def request(dbname, start_date: type | None = None, end_date: type | None = None):  # Проверить данные на корректность
+def request(dbname, start_date: str | None = None, end_date: str | None = None):  # Проверить данные на корректность
     correctinput, dtrequired = getjson_test(dbname)
     if not correctinput:
         return "The table wasn't found"
