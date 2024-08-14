@@ -2,19 +2,12 @@
 preview = false
 line-length = 120
 extend-include = ["*.ipynb"]
+target-version = "py312"
 
 [lint]
 select = ['ALL', "NPY201"]
 
-ignore = [
-    "D",
-    "TID252",
-    "RUF001",
-    "RUF003",
-    "PD901",
-    "PLR0913",
-    "ANN",
-]
+ignore = ["D", "TID252", "RUF001", "RUF003", "PD901", "PLR0913", "ANN"]
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401"]
