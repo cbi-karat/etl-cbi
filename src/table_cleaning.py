@@ -1,5 +1,5 @@
 import datetime
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 from sys import path
 
@@ -110,11 +110,28 @@ MODIFIED_ARTICLES = {
 def main():
     try:
         df = pd.read_csv("improved_table.csv")
+        end_date = datetime.datetime.now(tz=MSK_TZ).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
+            days=1,
+        )
+        last_date = end_date - timedelta(days=UPDATE_TIME)
+
+        df = df[df["Период"] <= last_date.strftime("%d.%m.%Y")]
+
+        start_date = (last_date + timedelta(days=1)).strftime("%d.%m.%Y")
+        end_date = end_date.strftime("%d.%m.%Y")
+
+        new_data = table_getting.request("Продажи_ПродажиФакт", start_date, end_date)
+        new_data = table_transformation(new_data)
+
+        df = pd.concat([df, new_data], axis=0, ignore_index=True)
+
+        merging(df)
+
     except FileNotFoundError:
         df = table_getting.request(
             "Продажи_ПродажиФакт",
             "01.08.2024",
-            datetime.datetime.now(tz=MSK_TZ)
+            (datetime.datetime.now(tz=MSK_TZ) - timedelta(days=1))
             .replace(
                 hour=0,
                 minute=0,
@@ -123,43 +140,9 @@ def main():
             )
             .strftime("%d.%m.%Y"),
         )
-        df = df.drop(columns=EXCESS_COLUMNS1)
-        df = df.rename(columns=COLUMNS_TO_RENAME)
-        df["Период"] = pd.to_datetime(df["Период"])
-        for column in STR_COLUMNS:
-            df[column] = df[column].apply(lambda x: str(x).strip()).copy()
-        df["gain_bpl"] = df["ВыручкаПоБПЛБезНДС"]
-        df["gain_fact"] = df["Объём_rub"]
-        df.to_csv("improved_table.csv", index=False)
-    last_date = datetime.datetime.now(tz=MSK_TZ).replace(
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
-    ) - timedelta(
-        days=UPDATE_TIME,
-    )
-    last_date = last_date.strftime("%Y-%m-%dT00:00:00")
 
-    df = df[df["Период"] <= last_date]
-
-    last_date = last_date[0:10].split("-")
-    last_date = date(int(last_date[0]), int(last_date[1]), int(last_date[2]))
-
-    start_date = (last_date + timedelta(days=1)).strftime("%d.%m.%Y")
-    end_date = datetime.datetime.now(tz=MSK_TZ).replace(hour=0, minute=0, second=0, microsecond=0).strftime("%d.%m.%Y")
-
-    new_data = table_getting.request("Продажи_ПродажиФакт", start_date, end_date)
-    new_data = new_data.drop(columns=EXCESS_COLUMNS1)
-    new_data = new_data.rename(columns=COLUMNS_TO_RENAME)
-
-    new_data["Период"] = pd.to_datetime(new_data["Период"])
-    for column in STR_COLUMNS:
-        new_data[column] = new_data[column].apply(lambda x: str(x).strip()).copy()
-    new_data["gain_bpl"] = new_data["ВыручкаПоБПЛБезНДС"]
-    new_data["gain_fact"] = new_data["Объём_rub"]
-    df = pd.concat([df, new_data], axis=0, ignore_index=True)
-    return merging(df)
+        df = table_transformation(df)
+        merging(df)
 
 
 def merging(df: pd.DataFrame):
@@ -168,14 +151,18 @@ def merging(df: pd.DataFrame):
     df2 = df2.rename(columns={"КодКлиента": "КлиентКод"})
     df2["КлиентКод"] = df2["КлиентКод"].apply(lambda x: str(x).strip()).copy()
     df2["КодКлиента1С"] = df2["КодКлиента1С"].apply(lambda x: str(x).strip()).copy()
+
     df = df.merge(df2, on="КлиентКод", how="left")
+
     df3 = table_getting.request("Продажи_НСИ_Клиенты")
     df3 = df3.drop(columns=EXCESS_COLUMNS3)
     df3 = df3.rename(columns={"КонтрагентПартнерКод": "КодКлиента1С"})
     df3["КодКлиента1С"] = df3["КодКлиента1С"].apply(lambda x: str(x).strip()).copy()
     df3["НаименованиеЛогическогоКлиента"] = df3["НаименованиеЛогическогоКлиента"].apply(lambda x: str(x).strip()).copy()
+
     df = df.merge(df3, on="КодКлиента1С", how="left")
-    return changing_articles(df)
+
+    changing_articles(df)
 
 
 def changing_articles(df: pd.DataFrame):
@@ -188,4 +175,15 @@ def changing_articles(df: pd.DataFrame):
         (df["НаименованиеЛогическогоКлиента"] == "ТАНДЕР АО (ТС Магнит)") & (df["Артикул"] == "Л1040"),
         "Артикул",
     ] = "Л0225"
+    df.to_csv("improved_table.csv", index=False)
+
+
+def table_transformation(df: pd.DataFrame):
+    df = df.drop(columns=EXCESS_COLUMNS1)
+    df = df.rename(columns=COLUMNS_TO_RENAME)
+    df["Период"] = pd.to_datetime(df["Период"])
+    for column in STR_COLUMNS:
+        df[column] = df[column].apply(lambda x: str(x).strip()).copy()
+    df["gain_bpl"] = df["ВыручкаПоБПЛБезНДС"]
+    df["gain_fact"] = df["Объём_rub"]
     return df
