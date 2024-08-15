@@ -8,11 +8,21 @@ import requests as req
 
 from credentials.KDL_passwords import KDL
 
+MSG_LIST = [
+    "The table wasn't found",
+    "Incorrect date",
+    "Dates are required",
+    "Dates aren't required",
+    "The error isn't defined",
+    """There is no data for this period, or this table uses grouping by month.
+    If the table uses month grouping, try using the format 01.MM.YYYY""",
+]
+
 
 def request(dbname, start_date: str | None = None, end_date: str | None = None):  # Проверить данные на корректность
     correctinput, dtrequired = getjson_test(dbname)
     if not correctinput:
-        return "The table wasn't found"
+        raise ValueError(MSG_LIST[0])
     if start_date is None and end_date is None:
         dates = False
         return check2(dates, dtrequired, dbname, start_date, end_date)
@@ -35,8 +45,8 @@ def check1(dtrequired, dbname, start_date, end_date):  # Проверить да
         start_date = start_date.split(".")
         try:
             start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
-        except ValueError:
-            return "Incorrect date"
+        except ValueError as e:
+            raise ValueError(MSG_LIST[1]) from e
         else:
             end_date = start_date
             return check2(dates, dtrequired, dbname, start_date, end_date)
@@ -61,32 +71,30 @@ def check1(dtrequired, dbname, start_date, end_date):  # Проверить да
         end_date = end_date.split(".")
         try:
             start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
-        except ValueError:
-            return "Incorrect date"
+        except ValueError as e:
+            raise ValueError(MSG_LIST[1]) from e
         try:
             end_date = date(int(end_date[2]), int(end_date[1]), int(end_date[0]))
-        except ValueError:
-            return "Incorrect date"
+        except ValueError as e:
+            raise ValueError(MSG_LIST[1]) from e
         else:
             return check2(dates, dtrequired, dbname, start_date, end_date)
     else:
-        return "Incorrect date"
+        raise ValueError(MSG_LIST[1])
 
 
 def check2(dates, dtrequired, dbname, start_date, end_date):  # Проверить данные на корректность
-    errors = ["Dates are required", "Dates aren't required", "The error isn't defined"]
-    error = 2
     if not dates and dtrequired:
-        error = 0
-    elif dates and not dtrequired:
-        error = 1
-    elif dates and dtrequired:
+        raise ValueError(MSG_LIST[2])
+    if dates and not dtrequired:
+        raise ValueError(MSG_LIST[3])
+    if dates and dtrequired:
         if start_date > end_date:
-            return "Incorrect date"
+            raise ValueError(MSG_LIST[1])
         return distribution(dbname, start_date, end_date)
-    elif not dates and not dtrequired:
+    if not dates and not dtrequired:
         return getjson_nodates(dbname)
-    return errors[error]
+    raise ValueError(MSG_LIST[4])
 
 
 def distribution(dbname, start_date, end_date):  # Обработать даты
@@ -196,6 +204,5 @@ def getjson_nodates(dbname):  # Получить таблицу с датами
 
 def convert_to_dataframe(response):  # Сделать таблицу
     if response == []:
-        return """There is no data for this period, or this table uses grouping by month.
-If the table uses month grouping, try using the format 01.MM.YYYY"""
+        raise ValueError(MSG_LIST[5])
     return pd.DataFrame(response)
