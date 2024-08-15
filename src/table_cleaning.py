@@ -115,7 +115,7 @@ def main():
         )
         last_date = end_date - timedelta(days=UPDATE_TIME)
 
-        df = df[df["Период"] <= last_date.strftime("%d.%m.%Y")]
+        df = df[df["Период"] <= last_date.strftime("%Y-%m-%d")]
 
         start_date = (last_date + timedelta(days=1)).strftime("%d.%m.%Y")
         end_date = end_date.strftime("%d.%m.%Y")
@@ -142,6 +142,7 @@ def main():
         )
 
         df = table_transformation(df)
+
         merging(df)
 
 
@@ -175,6 +176,9 @@ def changing_articles(df: pd.DataFrame):
         (df["НаименованиеЛогическогоКлиента"] == "ТАНДЕР АО (ТС Магнит)") & (df["Артикул"] == "Л1040"),
         "Артикул",
     ] = "Л0225"
+
+    df = df.drop(columns=["КодКлиента1С", "НаименованиеЛогическогоКлиента"])
+
     df.to_csv("improved_table.csv", index=False)
 
 
