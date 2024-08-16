@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-from sys import path
-
-import tables_joining
-
-path.append("C:/projects/etl_cbi")
 import contextlib
 from datetime import date, datetime, timedelta
 
 import pandas as pd
 import pytz
-
 import table_getting as tg
+import tables_joining
 
 
 def grouping(dbname, time_interval, groupby_list, start_date: type | None = None, end_date: type | None = None):

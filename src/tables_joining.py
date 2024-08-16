@@ -1,15 +1,13 @@
-from datetime import datetime, timedelta
 from pathlib import Path
 from sys import path
 
-import pandas as pd
-import requests as req
-
-path.append("C:/projects/etl_cbi")
+path.append(str(Path(__file__).resolve().parents[1]))
 import json
-from datetime import date
+from datetime import date, datetime, timedelta
 
+import pandas as pd
 import pytz
+import requests as req
 
 from credentials.KDL_passwords import KDL
 
@@ -104,7 +102,6 @@ def get_table1():  # Получить таблицу "Финансы_НСИ_SKU"
     query = {"DBName": "Финансы_НСИ_SKU"}
     query = json.dumps(query)
     login = KDL["login"]
-    login = login.encode("utf-8")
     password = KDL["password"]
     url = KDL["url"]
     response = req.post(
@@ -158,7 +155,6 @@ def get_table2():  # Получить таблицу "Продажи_Прода�
                 periods_list.append(end_date)
         responses = []
         login = KDL["login"]
-        login = login.encode("utf-8")
         password = KDL["password"]
         url = KDL["url"]
         with req.Session() as session:
@@ -239,7 +235,6 @@ def get_last_days():  # Получить последние update_time дней
             periods_list.append(end_date)
     responses = []
     login = KDL["login"]
-    login = login.encode("utf-8")
     password = KDL["password"]
     url = KDL["url"]
     with req.Session() as session:

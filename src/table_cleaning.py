@@ -1,11 +1,7 @@
 import datetime
 from datetime import timedelta
-from pathlib import Path
-from sys import path
 
 import pandas as pd
-
-path.append(str(Path(__file__).resolve().parents[1]))
 import table_getting
 
 UPDATE_TIME = 2  # This parameter must be an integer that is greater or equal to 1
