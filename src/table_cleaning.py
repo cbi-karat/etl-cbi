@@ -105,13 +105,13 @@ MODIFIED_ARTICLES = {
 
 def main():
     try:
-        df = pd.read_csv("improved_table.csv")
+        main_dataframe = pd.read_csv("improved_table.csv")
         end_date = datetime.datetime.now(tz=MSK_TZ).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
             days=1,
         )
         last_date = end_date - timedelta(days=UPDATE_TIME)
 
-        df = df[df["Период"] <= last_date.strftime("%Y-%m-%d")]
+        main_dataframe = main_dataframe[main_dataframe["Период"] <= last_date.strftime("%Y-%m-%d")]
 
         start_date = (last_date + timedelta(days=1)).strftime("%d.%m.%Y")
         end_date = end_date.strftime("%d.%m.%Y")
@@ -119,12 +119,12 @@ def main():
         new_data = table_getting.request("Продажи_ПродажиФакт", start_date, end_date)
         new_data = table_transformation(new_data)
 
-        df = pd.concat([df, new_data], axis=0, ignore_index=True)
+        main_dataframe = pd.concat([main_dataframe, new_data], axis=0, ignore_index=True)
 
-        merging(df)
+        merging(main_dataframe)
 
     except FileNotFoundError:
-        df = table_getting.request(
+        main_dataframe = table_getting.request(
             "Продажи_ПродажиФакт",
             "01.08.2024",
             (datetime.datetime.now(tz=MSK_TZ) - timedelta(days=1))
@@ -137,53 +137,57 @@ def main():
             .strftime("%d.%m.%Y"),
         )
 
-        df = table_transformation(df)
+        main_dataframe = table_transformation(main_dataframe)
 
-        merging(df)
-
-
-def merging(df: pd.DataFrame):
-    df2 = table_getting.request("Продажи_НСИ_Контрагенты")
-    df2 = df2.drop(columns=EXCESS_COLUMNS2)
-    df2 = df2.rename(columns={"КодКлиента": "КлиентКод"})
-    df2["КлиентКод"] = df2["КлиентКод"].apply(lambda x: str(x).strip()).copy()
-    df2["КодКлиента1С"] = df2["КодКлиента1С"].apply(lambda x: str(x).strip()).copy()
-
-    df = df.merge(df2, on="КлиентКод", how="left")
-
-    df3 = table_getting.request("Продажи_НСИ_Клиенты")
-    df3 = df3.drop(columns=EXCESS_COLUMNS3)
-    df3 = df3.rename(columns={"КонтрагентПартнерКод": "КодКлиента1С"})
-    df3["КодКлиента1С"] = df3["КодКлиента1С"].apply(lambda x: str(x).strip()).copy()
-    df3["НаименованиеЛогическогоКлиента"] = df3["НаименованиеЛогическогоКлиента"].apply(lambda x: str(x).strip()).copy()
-
-    df = df.merge(df3, on="КодКлиента1С", how="left")
-
-    changing_articles(df)
+        merging(main_dataframe)
 
 
-def changing_articles(df: pd.DataFrame):
-    df["Артикул"] = df["Артикул"].replace(MODIFIED_ARTICLES)
-    df.loc[
-        (df["НаименованиеЛогическогоКлиента"] == "ТАНДЕР АО (ТС Магнит)") & (df["Артикул"] == "Л1039"),
+def merging(main_dataframe: pd.DataFrame):
+    sales_contragents = table_getting.request("Продажи_НСИ_Контрагенты")
+    sales_contragents = sales_contragents.drop(columns=EXCESS_COLUMNS2)
+    sales_contragents = sales_contragents.rename(columns={"КодКлиента": "КлиентКод"})
+    sales_contragents["КлиентКод"] = sales_contragents["КлиентКод"].apply(lambda x: str(x).strip()).copy()
+    sales_contragents["КодКлиента1С"] = sales_contragents["КодКлиента1С"].apply(lambda x: str(x).strip()).copy()
+
+    main_dataframe = main_dataframe.merge(sales_contragents, on="КлиентКод", how="left")
+
+    sales_clients = table_getting.request("Продажи_НСИ_Клиенты")
+    sales_clients = sales_clients.drop(columns=EXCESS_COLUMNS3)
+    sales_clients = sales_clients.rename(columns={"КонтрагентПартнерКод": "КодКлиента1С"})
+    sales_clients["КодКлиента1С"] = sales_clients["КодКлиента1С"].apply(lambda x: str(x).strip()).copy()
+    sales_clients["НаименованиеЛогическогоКлиента"] = (
+        sales_clients["НаименованиеЛогическогоКлиента"].apply(lambda x: str(x).strip()).copy()
+    )
+
+    main_dataframe = main_dataframe.merge(sales_clients, on="КодКлиента1С", how="left")
+
+    changing_articles(main_dataframe)
+
+
+def changing_articles(main_dataframe: pd.DataFrame):
+    main_dataframe["Артикул"] = main_dataframe["Артикул"].replace(MODIFIED_ARTICLES)
+    main_dataframe.loc[
+        (main_dataframe["НаименованиеЛогическогоКлиента"] == "ТАНДЕР АО (ТС Магнит)")
+        & (main_dataframe["Артикул"] == "Л1039"),
         "Артикул",
     ] = "Л0214"
-    df.loc[
-        (df["НаименованиеЛогическогоКлиента"] == "ТАНДЕР АО (ТС Магнит)") & (df["Артикул"] == "Л1040"),
+    main_dataframe.loc[
+        (main_dataframe["НаименованиеЛогическогоКлиента"] == "ТАНДЕР АО (ТС Магнит)")
+        & (main_dataframe["Артикул"] == "Л1040"),
         "Артикул",
     ] = "Л0225"
 
-    df = df.drop(columns=["КодКлиента1С", "НаименованиеЛогическогоКлиента"])
+    main_dataframe = main_dataframe.drop(columns=["КодКлиента1С", "НаименованиеЛогическогоКлиента"])
 
-    df.to_csv("improved_table.csv", index=False)
+    main_dataframe.to_csv("improved_table.csv", index=False)
 
 
-def table_transformation(df: pd.DataFrame):
-    df = df.drop(columns=EXCESS_COLUMNS1)
-    df = df.rename(columns=COLUMNS_TO_RENAME)
-    df["Период"] = pd.to_datetime(df["Период"])
+def table_transformation(main_dataframe: pd.DataFrame):
+    main_dataframe = main_dataframe.drop(columns=EXCESS_COLUMNS1)
+    main_dataframe = main_dataframe.rename(columns=COLUMNS_TO_RENAME)
+    main_dataframe["Период"] = pd.to_datetime(main_dataframe["Период"])
     for column in STR_COLUMNS:
-        df[column] = df[column].apply(lambda x: str(x).strip()).copy()
-    df["gain_bpl"] = df["ВыручкаПоБПЛБезНДС"]
-    df["gain_fact"] = df["Объём_rub"]
-    return df
+        main_dataframe[column] = main_dataframe[column].apply(lambda x: str(x).strip()).copy()
+    main_dataframe["gain_bpl"] = main_dataframe["ВыручкаПоБПЛБезНДС"]
+    main_dataframe["gain_fact"] = main_dataframe["Объём_rub"]
+    return main_dataframe
