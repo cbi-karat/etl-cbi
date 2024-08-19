@@ -12,7 +12,7 @@ import requests as req
 
 from credentials.KDL_passwords import KDL
 
-SERVER_ERRORS = 500
+INTERNAL_SERVER_ERROR = 500
 MSG_LIST = [
     "The table {} wasn't found",
     "Incorrect date",
@@ -24,7 +24,7 @@ MSG_LIST = [
 ]
 
 
-def request(dbname: str, start_date: str | None = None, end_date: str | None = None):
+def get_table_from_kdl(dbname: str, start_date: str | None = None, end_date: str | None = None):
     dtrequired = dates_required_check(dbname)
     if dtrequired and start_date is None and end_date is None:
         raise ValueError(MSG_LIST[2])
@@ -84,7 +84,7 @@ def dates_required_check(dbname: str):
         json=query,
         timeout=100,
     )
-    return response.status_code != SERVER_ERRORS
+    return response.status_code != INTERNAL_SERVER_ERROR
 
 
 def get_json(dbname: str, periods_list: list | None = None):
@@ -111,7 +111,7 @@ def get_json(dbname: str, periods_list: list | None = None):
                     json=query,
                     timeout=100,
                 )
-                if response.status_code == SERVER_ERRORS:
+                if response.status_code == INTERNAL_SERVER_ERROR:
                     raise ValueError(MSG_LIST[0].format(dbname))
                 response = response.json()
                 response = json.loads(response["DBData"])
@@ -126,7 +126,7 @@ def get_json(dbname: str, periods_list: list | None = None):
         json=query,
         timeout=100,
     )
-    if response.status_code == SERVER_ERRORS:
+    if response.status_code == INTERNAL_SERVER_ERROR:
         raise ValueError(MSG_LIST[0].format(dbname))
     response = response.json()
     response = json.loads(response["DBData"])

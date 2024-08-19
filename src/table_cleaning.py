@@ -2,7 +2,8 @@ import datetime
 from datetime import timedelta
 
 import pandas as pd
-import table_getting
+
+import src.get_karat_db as tg
 
 UPDATE_TIME = 2  # This parameter must be an integer that is greater or equal to 1
 MSK_TZ = datetime.timezone(timedelta(hours=3), name="MSK")
@@ -116,7 +117,7 @@ def main():
         start_date = (last_date + timedelta(days=1)).strftime("%d.%m.%Y")
         end_date = end_date.strftime("%d.%m.%Y")
 
-        new_data = table_getting.request("Продажи_ПродажиФакт", start_date, end_date)
+        new_data = tg.get_table_from_kdl("Продажи_ПродажиФакт", start_date, end_date)
         new_data = table_transformation(new_data)
 
         main_dataframe = pd.concat([main_dataframe, new_data], axis=0, ignore_index=True)
@@ -124,7 +125,7 @@ def main():
         merging(main_dataframe)
 
     except FileNotFoundError:
-        main_dataframe = table_getting.request(
+        main_dataframe = tg.get_table_from_kdl(
             "Продажи_ПродажиФакт",
             "01.08.2024",
             (datetime.datetime.now(tz=MSK_TZ) - timedelta(days=1))
@@ -143,7 +144,7 @@ def main():
 
 
 def merging(main_dataframe: pd.DataFrame):
-    sales_contragents = table_getting.request("Продажи_НСИ_Контрагенты")
+    sales_contragents = tg.get_table_from_kdl("Продажи_НСИ_Контрагенты")
     sales_contragents = sales_contragents.drop(columns=EXCESS_COLUMNS2)
     sales_contragents = sales_contragents.rename(columns={"КодКлиента": "КлиентКод"})
     sales_contragents["КлиентКод"] = sales_contragents["КлиентКод"].apply(lambda x: str(x).strip()).copy()
@@ -151,7 +152,7 @@ def merging(main_dataframe: pd.DataFrame):
 
     main_dataframe = main_dataframe.merge(sales_contragents, on="КлиентКод", how="left")
 
-    sales_clients = table_getting.request("Продажи_НСИ_Клиенты")
+    sales_clients = tg.get_table_from_kdl("Продажи_НСИ_Клиенты")
     sales_clients = sales_clients.drop(columns=EXCESS_COLUMNS3)
     sales_clients = sales_clients.rename(columns={"КонтрагентПартнерКод": "КодКлиента1С"})
     sales_clients["КодКлиента1С"] = sales_clients["КодКлиента1С"].apply(lambda x: str(x).strip()).copy()
