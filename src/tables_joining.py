@@ -12,8 +12,7 @@ import requests as req
 from credentials.KDL_passwords import KDL
 
 update_time = 100
-if update_time < 0:
-    update_time = 0
+update_time = max(update_time, 0)
 keys_list1 = [
     "КодПродукта1С",
     "НаименованиеПродукта1С",

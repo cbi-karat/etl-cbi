@@ -3,11 +3,10 @@ from __future__ import annotations
 import contextlib
 from datetime import date, datetime, timedelta
 
+import get_karat_db
 import pandas as pd
 import pytz
-
-import src.get_karat_db as tg
-import src.tables_joining
+import tables_joining
 
 
 def grouping(dbname, time_interval, groupby_list, start_date: type | None = None, end_date: type | None = None):
@@ -80,7 +79,7 @@ def combined_table(time_interval, groupby_list, start_date, end_date):
         and time_interval[0] != "Кварталы"
     ):
         return "The time interval is incorrect"
-    table = src.tables_joining.get_dataframe()
+    table = tables_joining.get_dataframe()
     checkn3 = check3(table, time_interval[1], groupby_list)
     if isinstance(checkn3, str):
         return checkn3
@@ -174,7 +173,7 @@ def check3(table, time_interval, groupby_list):
 
 
 def get_table(dbname, start_date, end_date):
-    response = tg.get_table_from_kdl(dbname, start_date, end_date)
+    response = get_karat_db.get_table_from_kdl(dbname, start_date, end_date)
     if isinstance(response, str) and response == "Dates are required":
         start_date = date(2018, 1, 1)
         end_date = datetime.now(pytz.timezone("Europe/Moscow")).replace(
@@ -183,7 +182,7 @@ def get_table(dbname, start_date, end_date):
             second=0,
             microsecond=0,
         )
-        response = tg.get_table_from_kdl(dbname, start_date, end_date)
+        response = get_karat_db.get_table_from_kdl(dbname, start_date, end_date)
     return response
 
 
