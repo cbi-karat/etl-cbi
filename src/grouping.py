@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import math
 from datetime import date, timedelta, timezone
 
 import pandas as pd
@@ -12,16 +13,12 @@ MSG_LIST = [
     "The third argument must be a string",
     "The fourth argument must be a list",
     "The elements of the list, which is the fourth argument, must be strings",
-    "The fifth argument must be a string, or it doesn't need to be specified",
-    "The sixth argument must be a string, or it doesn't need to be specified",
-    "Incorrect date",
     "The time interval is incorrect",
     "The specified date column wasn't found",
     "The specified column contains empty fields",
     "The specified column doesn't contain dates",
     "Column names are repeated",
     "One or more columns weren't found in the table",
-    "It isn't possible to group a table by numeric columns",
 ]
 
 
@@ -35,12 +32,13 @@ def grouping(
     checking_column_names(dataframe, date_column, groupby_list)
     float_columns = []
     for i in dataframe.columns:
-        with contextlib.suppress(ValueError):
+        with contextlib.suppress(ValueError, TypeError):
             dataframe[i] = dataframe[i].astype(float)
             float_columns.append(i)
     for i in groupby_list:
         if i in float_columns:
-            raise ValueError(MSG_LIST[14])
+            float_columns.remove(i)
+    time_interval = convert_time_interval(time_interval)
     return table_changing(dataframe, date_column, time_interval, groupby_list, float_columns)
 
 
@@ -65,76 +63,62 @@ def type_checking(
 
 def checking_column_names(table: pd.DataFrame, date_column: str, groupby_list: list):
     if date_column not in list(table.columns):
-        raise ValueError(MSG_LIST[9])
+        raise ValueError(MSG_LIST[6])
     if bool(table[date_column].isna().any()):
-        raise ValueError(MSG_LIST[10])
-    first_date = table[date_column].to_numpy()[0]
+        raise ValueError(MSG_LIST[7])
+    first_date = table[date_column].iloc[0]
     if isinstance(first_date, str):
         first_date = first_date[:10]
         try:
             first_date = pd.to_datetime(first_date, format="%Y-%m-%d")
         except ValueError as e:
-            raise ValueError(MSG_LIST[11]) from e
+            raise ValueError(MSG_LIST[8]) from e
     elif not isinstance(first_date, date):
-        raise TypeError(MSG_LIST[11])
+        raise TypeError(MSG_LIST[8])
     groupby_set = set(groupby_list)
     if sorted(groupby_list) != sorted(groupby_set):
-        raise ValueError(MSG_LIST[12])
+        raise ValueError(MSG_LIST[9])
     if not set(groupby_list).issubset(set(table.columns)):
-        raise ValueError(MSG_LIST[13])
+        raise ValueError(MSG_LIST[10])
 
 
-def to_period_beginning(time_interval: str, given_date: str):
-    converted_date = pd.to_datetime(given_date, format="%d.%m.%Y")
-    if time_interval == "Недели":
-        converted_date = converted_date - timedelta(days=converted_date.weekday())
-    elif time_interval == "Месяцы":
-        converted_date = converted_date.replace(day=1)
-    elif time_interval == "Годы":
-        converted_date = converted_date.replace(month=1, day=1)
-    elif time_interval == "Декады":
-        converted_date = decades(converted_date)
-    elif time_interval == "Кварталы":
-        converted_date = quarters(converted_date)
+def convert_time_interval(time_interval: str):
+    if time_interval.lower() == "week" or time_interval.lower() == "w":
+        time_interval = "W"
+    elif time_interval.lower() == "month" or time_interval.lower() == "m":
+        time_interval = "MS"
+    elif time_interval.lower() == "year" or time_interval.lower() == "y":
+        time_interval = "YS"
+    elif time_interval.lower() == "decades_of_month" or time_interval.lower() == "md":
+        time_interval = "D"
+    elif time_interval.lower() == "quarters" or time_interval.lower() == "q":
+        time_interval = "QS"
     else:
-        raise ValueError(MSG_LIST[8])
-    return converted_date
+        raise ValueError(MSG_LIST[5])
+    return time_interval
 
 
-def decades(converted_date: date):
-    decade_2_start = 11
-    decade_3_start = 21
-    if converted_date.day < decade_2_start:
-        converted_date = converted_date.replace(day=1)
-    elif converted_date.day < decade_3_start:
-        converted_date = converted_date.replace(day=11)
-    else:
-        converted_date = converted_date.replace(day=21)
-    return converted_date
-
-
-def quarters(converted_date: date):
-    quarter_2_start = 4
-    quarter_3_start = 7
-    quarter_4_start = 10
-    if converted_date.month < quarter_2_start:
-        converted_date = converted_date.replace(month=1)
-    elif converted_date.month < quarter_3_start:
-        converted_date = converted_date.replace(month=4)
-    elif converted_date.month < quarter_4_start:
-        converted_date = converted_date.replace(month=7)
-    else:
-        converted_date = converted_date.replace(month=10)
-    return converted_date
-
-
-def table_changing(table: pd.DataFrame, date_column, time_interval, groupby_list, float_columns):
-    table["Период"] = table["Период"].apply(
-        lambda x: to_period_beginning(time_interval, pd.to_datetime(x).strftime("%d.%m.%Y")),
-    )
-    if date_column not in groupby_list:
-        groupby_list.insert(0, date_column)
-    str_columns = list(table.select_dtypes(include=["object"]).columns)
-    for i in str_columns:
-        table[i] = table[i].apply(lambda x: str(x).strip())
-    return table.groupby(groupby_list)[float_columns].sum().reset_index()
+def table_changing(
+    table: pd.DataFrame,
+    date_column: str,
+    time_interval: str,
+    groupby_list: list[str],
+    float_columns: list[str],
+):
+    if date_column in groupby_list:
+        groupby_list.remove(date_column)
+    table[date_column] = pd.to_datetime(table[date_column])
+    if time_interval == "W":
+        table = table.groupby(groupby_list).resample("W", on=date_column)[float_columns].sum().reset_index()
+        table["Период"] = table["Период"] + pd.DateOffset(days=-6)
+    elif time_interval != "D":
+        table = table.groupby(groupby_list).resample(time_interval, on=date_column)[float_columns].sum().reset_index()
+    first_column = table.pop(date_column)
+    table.insert(0, date_column, first_column)
+    if time_interval == "D":
+        table["Период"] = table["Период"].apply(lambda x: x.replace(day=(math.ceil(x.day / 10.4) - 1) * 10 + 1))
+        groupby_list.append(date_column)
+        table = table.groupby(groupby_list)[float_columns].sum().reset_index()
+        first_column = table.pop(date_column)
+        table.insert(0, date_column, first_column)
+    return table
