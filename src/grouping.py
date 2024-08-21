@@ -1,312 +1,140 @@
 from __future__ import annotations
 
 import contextlib
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta, timezone
 
-import get_karat_db
 import pandas as pd
-import pytz
-import tables_joining
+
+MSK_TZ = timezone(timedelta(hours=3), name="MSK")
+MSG_LIST = [
+    "The first argument must be a pandas.DataFrame",
+    "The second argument must be a string",
+    "The third argument must be a string",
+    "The fourth argument must be a list",
+    "The elements of the list, which is the fourth argument, must be strings",
+    "The fifth argument must be a string, or it doesn't need to be specified",
+    "The sixth argument must be a string, or it doesn't need to be specified",
+    "Incorrect date",
+    "The time interval is incorrect",
+    "The specified date column wasn't found",
+    "The specified column contains empty fields",
+    "The specified column doesn't contain dates",
+    "Column names are repeated",
+    "One or more columns weren't found in the table",
+    "It isn't possible to group a table by numeric columns",
+]
 
 
-def grouping(dbname, time_interval, groupby_list, start_date: type | None = None, end_date: type | None = None):
-    if dbname == "combined":
-        return combined_table(time_interval, groupby_list, start_date, end_date)
-    checkn1 = check1(time_interval, groupby_list)
-    if checkn1 != ".":
-        return checkn1
-    table = check2(dbname, time_interval[0], start_date, end_date)
-    if isinstance(table, str):
-        return table
-    checkn3 = check3(table, time_interval[1], groupby_list)
-    if isinstance(checkn3, str):
-        return checkn3
-    table = checkn3[0]
-    float_columns = checkn3[1]
+def grouping(
+    dataframe: pd.DataFrame,
+    date_column: str,
+    time_interval: str,
+    groupby_list: list[str],
+):
+    type_checking(dataframe, date_column, time_interval, groupby_list)
+    checking_column_names(dataframe, date_column, groupby_list)
+    float_columns = []
+    for i in dataframe.columns:
+        with contextlib.suppress(ValueError):
+            dataframe[i] = dataframe[i].astype(float)
+            float_columns.append(i)
     for i in groupby_list:
-        if float_columns.count(i) != 0:
-            return "It isn't possible to group a table by numeric columns"
-    return table_changing(table, time_interval, groupby_list, float_columns, start_date, end_date)
+        if i in float_columns:
+            raise ValueError(MSG_LIST[14])
+    return table_changing(dataframe, date_column, time_interval, groupby_list, float_columns)
 
 
-def combined_table(time_interval, groupby_list, start_date, end_date):
-    if start_date is not None or end_date is not None:
-        return "Dates aren't required"
-    float_columns = [
-        "Объем",
-        "ОбъемBaseLineКг",
-        "ОбъемПромоКг",
-        "Количество",
-        "КоличествоBaseLineШт",
-        "КоличествоПромоШт",
-        "ВыручкаПоБПЛБезНДС",
-        "ВыручкаПоПЛКБезНДС",
-        "ВыручкаNetБезНДС",
-        "ВыручкаNetBaseLineБезНДС",
-        "ВыручкаNetПромоБезНДС",
-        "ВыручкаNetсНДС",
-        "СкидкаБПЛПЛКбезНДС",
-        "СкидкаПЛКNetбезНДС",
-        "СуммаСкидкиФакт",
-        "ВыручкаПромоФакт",
-        "СуммаРБПромоФакт",
-        "СуммаПеременнойСебестоимостиПромоФакт",
-        "СуммаЛогистикиПромоФакт",
-        "СуммаРБФакт",
-        "СуммаПрочиеКУФакт",
-        "СуммаПеременнойСебестоимостиФакт",
-        "СуммаЛогистикиФакт",
-    ]
-    start_date = date(2018, 1, 1).strftime("%d.%m.%Y")
-    end_date = (
-        datetime.now(pytz.timezone("Europe/Moscow"))
-        .replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-        .strftime("%d.%m.%Y")
-    )
-    checkn1 = check1(time_interval, groupby_list)
-    if checkn1 != ".":
-        return checkn1
-    if (
-        time_interval[0] != "Недели"
-        and time_interval[0] != "Месяцы"
-        and time_interval[0] != "Годы"
-        and time_interval[0] != "Декады"
-        and time_interval[0] != "Кварталы"
-    ):
-        return "The time interval is incorrect"
-    table = tables_joining.get_dataframe()
-    checkn3 = check3(table, time_interval[1], groupby_list)
-    if isinstance(checkn3, str):
-        return checkn3
-    table = checkn3[0]
-    return table_changing(table, time_interval, groupby_list, float_columns, start_date, end_date)
-
-
-def check1(time_interval, groupby_list):
-    arg2len = 2
-    if not isinstance(time_interval, list):
-        return "The second argument must be a list"
-    if len(time_interval) != arg2len:
-        return "The second argument should be a list containing 2 elements"
-    if not (isinstance(time_interval[0], str) and isinstance(time_interval[1], str)):
-        return "The elements of the list, which is the second argument, must be strings"
+def type_checking(
+    table: pd.DataFrame,
+    date_column: str,
+    time_interval: str,
+    groupby_list: list,
+):
+    if not isinstance(table, pd.DataFrame):
+        raise TypeError(MSG_LIST[0])
+    if not isinstance(date_column, str):
+        raise TypeError(MSG_LIST[1])
+    if not isinstance(time_interval, str):
+        raise TypeError(MSG_LIST[2])
     if not isinstance(groupby_list, list):
-        return "The trird argument must be a list"
+        raise TypeError(MSG_LIST[3])
     for i in groupby_list:
         if not isinstance(i, str):
-            return "The elements of the list, which is the third argument, must be strings"
-    return "."
+            raise TypeError(MSG_LIST[4])
 
 
-def check2(dbname, time_interval, start_date, end_date):
-    datesymbols = 10
-    if end_date is None:
-        end_date = start_date
-    if (
-        isinstance(start_date, str)
-        and len(start_date) == datesymbols
-        and start_date[0:2].isdigit()
-        and start_date[3:5].isdigit()
-        and start_date[6:].isdigit()
-        and start_date[2] == "."
-        and start_date[5] == "."
-        and isinstance(end_date, str)
-        and len(end_date) == datesymbols
-        and end_date[0:2].isdigit()
-        and end_date[3:5].isdigit()
-        and end_date[6:].isdigit()
-        and end_date[2] == "."
-        and end_date[5] == "."
-    ):
-        try:
-            start_date = start_date.split(".")
-            start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
-            end_date = end_date.split(".")
-            end_date = date(int(end_date[2]), int(end_date[1]), int(end_date[0]))
-        except ValueError:
-            return get_table(dbname, start_date, end_date)
-        if start_date > end_date:
-            return "Incorrect date"
-        start_date, end_date = get_dates(start_date, end_date, time_interval)
-        if isinstance(start_date, str):
-            return start_date
-        start_date = start_date.strftime("%d.%m.%Y")
-        end_date = end_date.strftime("%d.%m.%Y")
-    return get_table(dbname, start_date, end_date)
-
-
-def check3(table, time_interval, groupby_list):
-    if list(table.columns).count(time_interval) == 0:
-        return "The specified date column wasn't found"
-    first_date = table.iloc[0][time_interval]
-    error = False
+def checking_column_names(table: pd.DataFrame, date_column: str, groupby_list: list):
+    if date_column not in list(table.columns):
+        raise ValueError(MSG_LIST[9])
+    if bool(table[date_column].isna().any()):
+        raise ValueError(MSG_LIST[10])
+    first_date = table[date_column].to_numpy()[0]
     if isinstance(first_date, str):
-        first_date = first_date.strip(" ")
-        datelen = 10
-        if len(first_date) >= datelen and first_date[4] == "-" and first_date[7] == "-":
-            first_date = first_date[:10].split("-")
-            for i in first_date:
-                if not i.isdigit():
-                    error = True
-        else:
-            error = True
-    else:
-        error = True
-    if error:
-        return "The specified column does not contain a date"
+        first_date = first_date[:10]
+        try:
+            first_date = pd.to_datetime(first_date, format="%Y-%m-%d")
+        except ValueError as e:
+            raise ValueError(MSG_LIST[11]) from e
+    elif not isinstance(first_date, date):
+        raise TypeError(MSG_LIST[11])
     groupby_set = set(groupby_list)
     if sorted(groupby_list) != sorted(groupby_set):
-        return "Column names are repeated"
+        raise ValueError(MSG_LIST[12])
     if not set(groupby_list).issubset(set(table.columns)):
-        return "One or more columns weren't found in the table"
-    float_columns = []
-    for i in table.columns:
-        with contextlib.suppress(ValueError):
-            table[i] = table[i].astype(float)
-            float_columns.append(i)
-    return [table, float_columns]
+        raise ValueError(MSG_LIST[13])
 
 
-def get_table(dbname, start_date, end_date):
-    response = get_karat_db.get_table_from_kdl(dbname, start_date, end_date)
-    if isinstance(response, str) and response == "Dates are required":
-        start_date = date(2018, 1, 1)
-        end_date = datetime.now(pytz.timezone("Europe/Moscow")).replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-        response = get_karat_db.get_table_from_kdl(dbname, start_date, end_date)
-    return response
-
-
-def get_dates(start_date, end_date, time_interval):
+def to_period_beginning(time_interval: str, given_date: str):
+    converted_date = pd.to_datetime(given_date, format="%d.%m.%Y")
     if time_interval == "Недели":
-        start_date = start_date - timedelta(days=start_date.weekday())
-        end_date = timedelta(days=6) - timedelta(days=end_date.weekday()) + end_date
+        converted_date = converted_date - timedelta(days=converted_date.weekday())
     elif time_interval == "Месяцы":
-        start_date = start_date.replace(day=1)
-        end_date = end_date.replace(day=1)
-        try:
-            end_date = end_date.replace(month=int(end_date.strftime("%m")) + 1) - timedelta(days=1)
-        except ValueError:
-            end_date = end_date.replace(month=1)
-            end_date = end_date.replace(year=int(end_date.strftime("%Y")) + 1) - timedelta(days=1)
+        converted_date = converted_date.replace(day=1)
     elif time_interval == "Годы":
-        start_date = start_date.replace(month=1, day=1)
-        end_date = end_date.replace(month=12, day=31)
+        converted_date = converted_date.replace(month=1, day=1)
     elif time_interval == "Декады":
-        start_date, end_date = decades(start_date, end_date)
+        converted_date = decades(converted_date)
     elif time_interval == "Кварталы":
-        start_date, end_date = quarters(start_date, end_date)
+        converted_date = quarters(converted_date)
     else:
-        return "The time interval is incorrect", None
-    return start_date, end_date
+        raise ValueError(MSG_LIST[8])
+    return converted_date
 
 
-def decades(start_date, end_date):
-    n2 = 11
-    n3 = 21
-    sday = int(start_date.strftime("%d"))
-    eday = int(end_date.strftime("%d"))
-    if sday < n2:
-        start_date = start_date.replace(day=1)
-    elif sday < n3:
-        start_date = start_date.replace(day=11)
+def decades(converted_date: date):
+    decade_2_start = 11
+    decade_3_start = 21
+    if converted_date.day < decade_2_start:
+        converted_date = converted_date.replace(day=1)
+    elif converted_date.day < decade_3_start:
+        converted_date = converted_date.replace(day=11)
     else:
-        start_date = start_date.replace(day=21)
-    if eday < n2:
-        end_date = end_date.replace(day=10)
-    elif eday < n3:
-        end_date = end_date.replace(day=20)
+        converted_date = converted_date.replace(day=21)
+    return converted_date
+
+
+def quarters(converted_date: date):
+    quarter_2_start = 4
+    quarter_3_start = 7
+    quarter_4_start = 10
+    if converted_date.month < quarter_2_start:
+        converted_date = converted_date.replace(month=1)
+    elif converted_date.month < quarter_3_start:
+        converted_date = converted_date.replace(month=4)
+    elif converted_date.month < quarter_4_start:
+        converted_date = converted_date.replace(month=7)
     else:
-        end_date = end_date.replace(day=1)
-        try:
-            end_date = end_date.replace(month=int(end_date.strftime("%m")) + 1) - timedelta(days=1)
-        except ValueError:
-            end_date = end_date.replace(month=1)
-            end_date = end_date.replace(year=int(end_date.strftime("%Y")) + 1) - timedelta(days=1)
-    return start_date, end_date
+        converted_date = converted_date.replace(month=10)
+    return converted_date
 
 
-def quarters(start_date, end_date):
-    n2 = 4
-    n3 = 7
-    n4 = 10
-    smonth = int(start_date.strftime("%m"))
-    emonth = int(end_date.strftime("%m"))
-    if smonth < n2:
-        start_date = start_date.replace(month=1)
-    elif smonth < n3:
-        start_date = start_date.replace(month=4)
-    elif smonth < n4:
-        start_date = start_date.replace(month=7)
-    else:
-        start_date = start_date.replace(month=10)
-    if emonth < n2:
-        end_date = end_date.replace(month=4, day=1) - timedelta(days=1)
-    elif emonth < n3:
-        end_date = end_date.replace(month=7, day=1) - timedelta(days=1)
-    elif emonth < n4:
-        end_date = end_date.replace(month=10, day=1) - timedelta(days=1)
-    else:
-        end_date = end_date.replace(month=1, day=1)
-        end_date = end_date.replace(year=int(end_date.strftime("%Y")) + 1) - timedelta(days=1)
-    return start_date, end_date
-
-
-def splitting(interval_start, interval_end, time_interval):
-    end_date = interval_end
-    dates_dict = {}
-    while interval_start < end_date:
-        interval_start, interval_end = get_dates(interval_start, interval_start, time_interval)
-        interim_date = interval_start
-        temp_list = []
-        while interim_date != interval_end:
-            interim_date += timedelta(days=1)
-            temp_list.append(interim_date.strftime("%Y-%m-%dT00:00:00"))
-        dates_dict[interval_start.strftime("%Y-%m-%dT00:00:00")] = temp_list
-        interval_start = interim_date + timedelta(days=1)
-    return dates_dict
-
-
-def table_changing(table, time_interval, groupby_list, float_columns, start_date, end_date):
-    date_column = time_interval[1]
-    time_interval = time_interval[0]
-    groupby_list.insert(0, date_column)
-    if start_date is None:
-        start_date = date(2018, 1, 1)
-        end_date = datetime.now(pytz.timezone("Europe/Moscow")).replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-    elif end_date is None:
-        end_date = start_date
-    start_date = start_date.split(".")
-    end_date = end_date.split(".")
-    start_date = date(int(start_date[2]), int(start_date[1]), int(start_date[0]))
-    end_date = date(int(end_date[2]), int(end_date[1]), int(end_date[0]))
-    start_date, end_date = get_dates(start_date, end_date, time_interval)
-    dates_dict = splitting(start_date, end_date, time_interval)
-    new_dict = {}
-    keylist = list(table.keys())
-    for key in keylist:
-        temp_dict = {}
-        for i in range(list(table[keylist[0]].keys())[-1] + 1):
-            temp_dict[i] = str(table[key][i]).strip()
-        new_dict[key] = temp_dict
-    table = pd.DataFrame(new_dict)
-    for i in table.columns:
-        with contextlib.suppress(ValueError):
-            table[i] = table[i].astype(float)
-    for key in dates_dict:
-        table = table.replace(dates_dict[key], key)
+def table_changing(table: pd.DataFrame, date_column, time_interval, groupby_list, float_columns):
+    table["Период"] = table["Период"].apply(
+        lambda x: to_period_beginning(time_interval, pd.to_datetime(x).strftime("%d.%m.%Y")),
+    )
+    if date_column not in groupby_list:
+        groupby_list.insert(0, date_column)
+    str_columns = list(table.select_dtypes(include=["object"]).columns)
+    for i in str_columns:
+        table[i] = table[i].apply(lambda x: str(x).strip())
     return table.groupby(groupby_list)[float_columns].sum().reset_index()

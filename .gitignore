@@ -1,6 +1,6 @@
 .venv
 credentials
-tables
+jupyter.ipynb
 .vscode
 __pycache__/
 *.py[cod]
