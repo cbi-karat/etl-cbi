@@ -93,7 +93,7 @@ def get_json(dbname: str, periods_list: list | None = None):
     login = login.decode("latin-1")
     password = KDL["password"]
     url = KDL["url"]
-    if periods_list is not None:
+    if periods_list is not None and len(periods_list) != 1:
         responses = []
         with req.Session() as session:
             for i in range(len(periods_list) - 1):
@@ -118,7 +118,14 @@ def get_json(dbname: str, periods_list: list | None = None):
                 response = response["Результат"]
                 responses += response
         return responses
-    query = {"DBName": dbname}
+    if periods_list is not None:
+        query = {
+            "DBName": dbname,
+            "НачалоПериода": periods_list[0].isoformat(),
+            "КонецПериода": periods_list[0].isoformat(),
+        }
+    else:
+        query = {"DBName": dbname}
     query = json.dumps(query)
     response = req.post(
         url,
