@@ -14,22 +14,47 @@ from credentials.KDL_passwords import KDL
 
 INTERNAL_SERVER_ERROR = 500
 MSG_LIST = [
-    "The table {} wasn't found",
-    "Incorrect date",
     "Dates are required",
     "Dates aren't required",
-    "The error isn't defined",
+    """The table "{}" wasn't found""",
     """There is no data for this period, or this table uses grouping by month.
     If the table uses month grouping, try using the format 01.MM.YYYY""",
+    "Incorrect date",
+    "The first date is less than the second",
+    "The error isn't defined",
 ]
+
+
+class MissingDatesError(Exception):
+    pass
+
+
+class ExtraDatesError(Exception):
+    pass
+
+
+class TableNameError(Exception):
+    pass
+
+
+class EmptyDataframeError(Exception):
+    pass
+
+
+class IncorrectDateError(Exception):
+    pass
+
+
+class UndefinedError(Exception):
+    pass
 
 
 def get_table_from_kdl(dbname: str, start_date: str | None = None, end_date: str | None = None):
     dtrequired = dates_required_check(dbname)
     if dtrequired and start_date is None and end_date is None:
-        raise ValueError(MSG_LIST[2])
+        raise MissingDatesError(MSG_LIST[0])
     if not dtrequired and start_date is not None:
-        raise ValueError(MSG_LIST[3])
+        raise ExtraDatesError(MSG_LIST[1])
     if start_date is None and end_date is None:
         response = get_json(dbname, None)
         return convert_json_to_dataframe(response)
@@ -40,24 +65,29 @@ def get_table_from_kdl(dbname: str, start_date: str | None = None, end_date: str
         dates_list = splitting_period_by_month(start_dt_date_type, end_dt_date_type)
         response = get_json(dbname, dates_list)
         return convert_json_to_dataframe(response)
-    raise ValueError(MSG_LIST[4])
+    raise UndefinedError(MSG_LIST[6])
 
 
 def dates_correctness_check(start_date: str, end_date: str | None):
     if end_date is None:
         try:
             test_start_date = pd.to_datetime(start_date, format="%d.%m.%Y")
-        except ValueError as e:
-            raise ValueError(MSG_LIST[1]) from e
+            if not isinstance(test_start_date, date):
+                raise IncorrectDateError(MSG_LIST[4])
+        except ValueError:
+            raise IncorrectDateError(MSG_LIST[4]) from None
     elif end_date is not None:
         try:
             test_start_date = pd.to_datetime(start_date, format="%d.%m.%Y")
             test_end_date = pd.to_datetime(end_date, format="%d.%m.%Y")
-        except ValueError as e:
-            raise ValueError(MSG_LIST[1]) from e
-        else:
+            if not isinstance(test_start_date, date):
+                raise IncorrectDateError(MSG_LIST[4])
+            if not isinstance(test_end_date, date):
+                raise IncorrectDateError(MSG_LIST[4])
             if test_start_date > test_end_date:
-                raise ValueError(MSG_LIST[1])
+                raise IncorrectDateError(MSG_LIST[5])
+        except ValueError:
+            raise IncorrectDateError(MSG_LIST[4]) from None
 
 
 def splitting_period_by_month(start_date: date, end_date: date):
@@ -93,7 +123,7 @@ def get_json(dbname: str, periods_list: list | None = None):
     login = login.decode("latin-1")
     password = KDL["password"]
     url = KDL["url"]
-    if periods_list is not None:
+    if periods_list is not None and len(periods_list) != 1:
         responses = []
         with req.Session() as session:
             for i in range(len(periods_list) - 1):
@@ -112,13 +142,20 @@ def get_json(dbname: str, periods_list: list | None = None):
                     timeout=100,
                 )
                 if response.status_code == INTERNAL_SERVER_ERROR:
-                    raise ValueError(MSG_LIST[0].format(dbname))
+                    raise TableNameError(MSG_LIST[2].format(dbname))
                 response = response.json()
                 response = json.loads(response["DBData"])
                 response = response["Результат"]
                 responses += response
         return responses
-    query = {"DBName": dbname}
+    if periods_list is not None:
+        query = {
+            "DBName": dbname,
+            "НачалоПериода": periods_list[0].isoformat(),
+            "КонецПериода": periods_list[0].isoformat(),
+        }
+    else:
+        query = {"DBName": dbname}
     query = json.dumps(query)
     response = req.post(
         url,
@@ -127,7 +164,7 @@ def get_json(dbname: str, periods_list: list | None = None):
         timeout=100,
     )
     if response.status_code == INTERNAL_SERVER_ERROR:
-        raise ValueError(MSG_LIST[0].format(dbname))
+        raise TableNameError(MSG_LIST[2].format(dbname))
     response = response.json()
     response = json.loads(response["DBData"])
     return response["Результат"]
@@ -135,5 +172,5 @@ def get_json(dbname: str, periods_list: list | None = None):
 
 def convert_json_to_dataframe(response: list):
     if response == []:
-        raise ValueError(MSG_LIST[5])
+        raise EmptyDataframeError(MSG_LIST[3])
     return pd.DataFrame(response)
