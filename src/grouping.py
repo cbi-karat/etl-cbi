@@ -110,13 +110,15 @@ def table_changing(
     table[date_column] = pd.to_datetime(table[date_column])
     if time_interval == "W":
         table = table.groupby(groupby_list).resample("W", on=date_column)[float_columns].sum().reset_index()
-        table["Период"] = table["Период"] + pd.DateOffset(days=-6)
+        table[date_column] = table[date_column] + pd.DateOffset(days=-6)
     elif time_interval != "D":
         table = table.groupby(groupby_list).resample(time_interval, on=date_column)[float_columns].sum().reset_index()
     first_column = table.pop(date_column)
     table.insert(0, date_column, first_column)
     if time_interval == "D":
-        table["Период"] = table["Период"].apply(lambda x: x.replace(day=(math.ceil(x.day / 10.4) - 1) * 10 + 1))
+        table[date_column] = table[date_column].apply(
+            lambda x: x.replace(day=(math.ceil(x.day / 10.4) - 1) * 10 + 1),
+        )  # This line replaces all the dates in the table with decades of the month
         groupby_list.append(date_column)
         table = table.groupby(groupby_list)[float_columns].sum().reset_index()
         first_column = table.pop(date_column)
