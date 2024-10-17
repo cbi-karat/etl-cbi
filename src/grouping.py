@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import math
 from datetime import date, timedelta, timezone
 
@@ -17,8 +16,10 @@ MSG_LIST = [
     "The specified date column wasn't found",
     "The specified column contains empty fields",
     "The specified column doesn't contain dates",
-    "Column names are repeated",
-    "One or more columns weren't found in the table",
+    "Grouping columns are repeated",
+    "One or more grouping columns weren't found",
+    "Numeric columns are repeated",
+    "One or more numeric columns weren't found",
 ]
 
 
@@ -27,19 +28,12 @@ def grouping(
     date_column: str,
     time_interval: str,
     groupby_list: list[str],
+    numeric_columns_list: list[str],
 ):
     type_checking(dataframe, date_column, time_interval, groupby_list)
-    checking_column_names(dataframe, date_column, groupby_list)
-    float_columns = []
-    for i in dataframe.columns:
-        with contextlib.suppress(ValueError, TypeError):
-            dataframe[i] = dataframe[i].astype(float)
-            float_columns.append(i)
-    for i in groupby_list:
-        if i in float_columns:
-            float_columns.remove(i)
+    checking_column_names(dataframe, date_column, groupby_list, numeric_columns_list)
     time_interval = convert_time_interval(time_interval)
-    return table_changing(dataframe, date_column, time_interval, groupby_list, float_columns)
+    return table_changing(dataframe, date_column, time_interval, groupby_list, numeric_columns_list)
 
 
 def type_checking(
@@ -61,7 +55,7 @@ def type_checking(
             raise TypeError(MSG_LIST[4])
 
 
-def checking_column_names(table: pd.DataFrame, date_column: str, groupby_list: list):
+def checking_column_names(table: pd.DataFrame, date_column: str, groupby_list: list, numeric_columns_list: list):
     if date_column not in list(table.columns):
         raise ValueError(MSG_LIST[6])
     if bool(table[date_column].isna().any()):
@@ -75,11 +69,18 @@ def checking_column_names(table: pd.DataFrame, date_column: str, groupby_list: l
             raise ValueError(MSG_LIST[8]) from e
     elif not isinstance(first_date, date):
         raise TypeError(MSG_LIST[8])
+
     groupby_set = set(groupby_list)
     if sorted(groupby_list) != sorted(groupby_set):
         raise ValueError(MSG_LIST[9])
     if not set(groupby_list).issubset(set(table.columns)):
         raise ValueError(MSG_LIST[10])
+
+    numeric_columns_set = set(numeric_columns_list)
+    if sorted(numeric_columns_list) != sorted(numeric_columns_set):
+        raise ValueError(MSG_LIST[11])
+    if not set(numeric_columns_list).issubset(set(table.columns)):
+        raise ValueError(MSG_LIST[12])
 
 
 def convert_time_interval(time_interval: str):

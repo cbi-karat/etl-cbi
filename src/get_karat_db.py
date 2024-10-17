@@ -48,7 +48,7 @@ def get_table_from_kdl(dbname: str, start_date: str | None = None, end_date: str
             dates_list = convert_date_format(start_date, end_date)
     if not dtrequired and start_date is not None:
         raise ExtraDatesError(MSG_LIST[1])
-    response = get_json_table(dbname, dates_list)
+    response = get_response_from_kdl(dbname, dates_list)
     return convert_json_to_dataframe(response)
 
 
@@ -110,7 +110,7 @@ def dates_required_check(dbname: str):
     return response.status_code != INTERNAL_SERVER_ERROR
 
 
-def get_json_table(dbname: str, periods_list: list | None = None):
+def get_response_from_kdl(dbname: str, periods_list: list | None = None):
     login = KDL["login"]
     login = login.encode("utf-8")
     login = login.decode("latin-1")
@@ -128,16 +128,16 @@ def get_json_table(dbname: str, periods_list: list | None = None):
                     "КонецПериода": end_date.isoformat(),
                 }
                 query = json.dumps(query)
-                response = get_response_from_kdl(url, login, password, query, dbname, session)
+                response = send_request(url, login, password, query, dbname, session)
                 responses += response
         return responses
     query = {"DBName": dbname}
     query = json.dumps(query)
     with req.Session() as session:
-        return get_response_from_kdl(url, login, password, query, dbname, session)
+        return send_request(url, login, password, query, dbname, session)
 
 
-def get_response_from_kdl(url, login, password, query, dbname, session):
+def send_request(url, login, password, query, dbname, session):
     response = session.post(
         url,
         auth=(login, password),
