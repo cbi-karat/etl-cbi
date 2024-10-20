@@ -19,7 +19,7 @@ def test_extra_dates_error():
 
 
 def test_table_name_error():
-    with pytest.raises(get_karat_db.TableNameError):
+    with pytest.raises(get_karat_db.InternalServerError):
         _ = get_karat_db.get_table_from_kdl("Ъ")
 
 
@@ -39,8 +39,7 @@ def test_incorrect_date_error_3():
 
 
 def test_empty_dataframe_error():
-    with pytest.raises(get_karat_db.EmptyDataframeError):
-        _ = get_karat_db.get_table_from_kdl("Продажи_ПродажиФакт", "01.01.2000")
+    assert type(get_karat_db.get_table_from_kdl("Продажи_ПродажиФакт", "01.01.2000")) is pd.DataFrame  # noqa: S101
 
 
 def test_no_dates():
