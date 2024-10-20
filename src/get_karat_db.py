@@ -26,7 +26,7 @@ class ExtraDatesError(Exception):
     pass
 
 
-class TableNameError(Exception):
+class InternalServerError(Exception):
     pass
 
 
@@ -95,27 +95,15 @@ def prepare_dates_for_request(start_date: date, end_date: date):
 
 def dates_required_check(dbname: str):
     query = {"DBName": dbname, "НачалоПериода": date(1, 1, 1).isoformat(), "КонецПериода": date(1, 1, 1).isoformat()}
-    query = json.dumps(query)
-    login = KDL["login"]
-    login = login.encode("utf-8")
-    login = login.decode("latin-1")
-    password = KDL["password"]
-    url = KDL["url"]
-    response = req.post(
-        url,
-        auth=(login, password),
-        json=query,
-        timeout=100,
-    )
-    return response.status_code != INTERNAL_SERVER_ERROR
+    with req.Session() as session:
+        try:
+            _ = _send_request(query, session)
+        except InternalServerError:
+            return False
+        return True
 
 
 def get_response_from_kdl(dbname: str, periods_list: list | None = None):
-    login = KDL["login"]
-    login = login.encode("utf-8")
-    login = login.decode("latin-1")
-    password = KDL["password"]
-    url = KDL["url"]
     if periods_list is not None:
         responses = []
         with req.Session() as session:
@@ -127,17 +115,21 @@ def get_response_from_kdl(dbname: str, periods_list: list | None = None):
                     "НачалоПериода": start_date.isoformat(),
                     "КонецПериода": end_date.isoformat(),
                 }
-                query = json.dumps(query)
-                response = send_request(url, login, password, query, dbname, session)
+                response = _send_request(query, session)
                 responses += response
         return responses
     query = {"DBName": dbname}
-    query = json.dumps(query)
     with req.Session() as session:
-        return send_request(url, login, password, query, dbname, session)
+        return _send_request(query, session)
 
 
-def send_request(url, login, password, query, dbname, session):
+def _send_request(args: dict, session):
+    login = KDL["login"]
+    login = login.encode("utf-8")
+    login = login.decode("latin-1")
+    password = KDL["password"]
+    url = KDL["url"]
+    query = json.dumps(args)
     response = session.post(
         url,
         auth=(login, password),
@@ -145,7 +137,7 @@ def send_request(url, login, password, query, dbname, session):
         timeout=100,
     )
     if response.status_code == INTERNAL_SERVER_ERROR:
-        raise TableNameError(MSG_LIST[2].format(dbname))
+        raise InternalServerError(MSG_LIST[2].format(args["DBName"]))
     response = response.json()
     response = json.loads(response["DBData"])
     return response["Результат"]
