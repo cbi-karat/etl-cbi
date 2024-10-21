@@ -4,5 +4,3 @@ jupyter.ipynb
 .vscode
 __pycache__/
 *.py[cod]
-improved_table.csv
-datetimeplus.py
